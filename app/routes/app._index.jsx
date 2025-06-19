@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useFetcher, Link, useLoaderData } from "@remix-run/react";
+import { useEffect, useState } from "react";
+import { useFetcher, Link, useLoaderData, useSubmit, useActionData, useNavigate } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -13,10 +13,12 @@ import {
   Thumbnail,
   ActionMenu,
   EmptyState,
+  Modal,
+  Banner,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { getBundles } from "../models/Bundle.server";
+import { getBundles, deleteBundle } from "../models/Bundle.server";
 import { json } from "@remix-run/node";
 
 export const loader = async ({ request }) => {
@@ -31,27 +33,67 @@ export const loader = async ({ request }) => {
   }
 };
 
+export const action = async ({ request }) => {
+  const { admin, session } = await authenticate.admin(request);
+  const formData = await request.formData();
+  const action = formData.get("action");
+  
+  if (action === "delete") {
+    const bundleId = parseInt(formData.get("bundleId"));
+    
+    try {
+      await deleteBundle(bundleId);
+      return json({ success: true, message: "Bundle deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting bundle:", error);
+      return json({ success: false, message: "Failed to delete bundle" });
+    }
+  }
+  
+  return json({ success: false, message: "Invalid action" });
+};
+
 export default function Index() {
   const { bundles } = useLoaderData();
+  const actionData = useActionData();
+  const submit = useSubmit();
+  const navigate = useNavigate();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [bundleToDelete, setBundleToDelete] = useState(null);
 
   const handleEdit = (bundleId) => {
-    // Phase 2: Implement edit functionality
-    console.log("Edit bundle:", bundleId);
+    navigate(`/app/create-bundle/${bundleId}`);
   };
 
-  const handleDelete = (bundleId) => {
-    // Phase 3: Implement delete functionality
-    console.log("Delete bundle:", bundleId);
+  const handleDelete = (bundle) => {
+    setBundleToDelete(bundle);
+    setDeleteModalOpen(true);
   };
 
-  const actionMenuItems = (bundleId) => [
+  const confirmDelete = () => {
+    if (bundleToDelete) {
+      const formData = new FormData();
+      formData.append("action", "delete");
+      formData.append("bundleId", bundleToDelete.id.toString());
+      submit(formData, { method: "post" });
+      setDeleteModalOpen(false);
+      setBundleToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteModalOpen(false);
+    setBundleToDelete(null);
+  };
+
+  const actionMenuItems = (bundle) => [
     {
       content: "Edit",
-      onAction: () => handleEdit(bundleId),
+      onAction: () => handleEdit(bundle.id),
     },
     {
       content: "Delete",
-      onAction: () => handleDelete(bundleId),
+      onAction: () => handleDelete(bundle),
     },
   ];
 
@@ -67,6 +109,12 @@ export default function Index() {
           <Layout.Section>
             <Card>
               <BlockStack gap="500">
+                {actionData?.message && (
+                  <Banner tone={actionData.success ? "success" : "critical"}>
+                    {actionData.message}
+                  </Banner>
+                )}
+                
                 <BlockStack gap="200">
                   <Text as="h2" variant="headingMd">
                     Your Bundles
@@ -112,7 +160,7 @@ export default function Index() {
                             </BlockStack>
                           </InlineStack>
                           <ActionMenu
-                            actions={actionMenuItems(bundle.id)}
+                            actions={actionMenuItems(bundle)}
                             trigger="..."
                           />
                         </InlineStack>
@@ -125,6 +173,29 @@ export default function Index() {
           </Layout.Section>
         </Layout>
       </BlockStack>
+
+      <Modal
+        open={deleteModalOpen}
+        onClose={cancelDelete}
+        title="Delete Bundle"
+        primaryAction={{
+          content: "Delete",
+          destructive: true,
+          onAction: confirmDelete,
+        }}
+        secondaryActions={[
+          {
+            content: "Cancel",
+            onAction: cancelDelete,
+          },
+        ]}
+      >
+        <Modal.Section>
+          <Text as="p">
+            Are you sure you want to delete "{bundleToDelete?.title}"? This action cannot be undone.
+          </Text>
+        </Modal.Section>
+      </Modal>
     </Page>
   );
 }

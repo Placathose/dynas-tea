@@ -22,14 +22,15 @@ import db from "../db.server";
 export async function loader({ request, params }) {
   const { admin } = await authenticate.admin(request);
   
-  // If no ID is provided, this is a create route
-  if (!params.id || params.id === "new") {
-    return json({ bundle: null, isEditing: false });
+  // Get the bundle ID from params
+  const bundleId = parseInt(params.id);
+  
+  if (!bundleId || isNaN(bundleId)) {
+    throw new Response("Invalid bundle ID", { status: 400 });
   }
   
-  // If ID is provided, try to fetch the bundle
   try {
-    const bundle = await getBundle(parseInt(params.id), admin.graphql);
+    const bundle = await getBundle(bundleId, admin.graphql);
     if (!bundle) {
       throw new Response("Bundle not found", { status: 404 });
     }
@@ -46,6 +47,7 @@ export async function action({ request, params }) {
   const { admin, session } = await authenticate.admin(request);
   
   const formData = await request.formData();
+  const bundleId = parseInt(params.id);
   
   // Ensure the shop exists in the database
   try {
@@ -205,20 +207,14 @@ export async function action({ request, params }) {
   }
 
   try {
-    // If no ID is provided, this is a create route
-    if (!params.id || params.id === "new") {
-      await createBundle(bundleData);
-    } else {
-      await updateBundle(parseInt(params.id), bundleData);
-    }
-    
+    await updateBundle(bundleId, bundleData);
     return { success: true };
   } catch (error) {
     return { errors: { general: `Failed to save bundle: ${error.message}` } };
   }
 }
 
-export default function CreateBundle() {
+export default function EditBundle() {
   const { bundle, isEditing } = useLoaderData();
   const actionData = useActionData();
   const navigate = useNavigate();
@@ -283,7 +279,7 @@ export default function CreateBundle() {
   };
 
   const handleProductSelect = (productData) => {
-    console.log("CreateBundle - handleProductSelect called with:", productData);
+    console.log("EditBundle - handleProductSelect called with:", productData);
     setSelectedProduct(productData);
   };
 
@@ -292,8 +288,8 @@ export default function CreateBundle() {
   };
 
   // Debug logging for selectedProduct state
-  console.log("CreateBundle - selectedProduct state:", selectedProduct);
-  console.log("CreateBundle - bundle data:", bundle);
+  console.log("EditBundle - selectedProduct state:", selectedProduct);
+  console.log("EditBundle - bundle data:", bundle);
 
   useEffect(() => {
     if (actionData?.success) {
@@ -305,7 +301,7 @@ export default function CreateBundle() {
 
   return (
     <Page
-      title={isEditing ? "Edit Bundle" : "Create Bundle"}
+      title="Edit Bundle"
       backAction={{ content: "Bundles", onAction: handleCancel }}
     >
       <Layout>
@@ -375,7 +371,7 @@ export default function CreateBundle() {
                 <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                   <Button onClick={handleCancel}>Cancel</Button>
                   <Button variant="primary" submit>
-                    {isEditing ? "Save Changes" : "Create Bundle"}
+                    Save Changes
                   </Button>
                 </div>
               </FormLayout>

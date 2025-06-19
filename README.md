@@ -132,6 +132,21 @@ targetProduct: {
 
 **Files**: `app/models/Bundle.server.js:140-155`
 
+---
+
+### 11. **Product Image Preview Issue**
+**Challenge**: Product thumbnails not displaying after selection due to incorrect image data extraction from Shopify resource picker.
+
+**Solution**:
+- Identified that Shopify resource picker returns images with `originalSrc` property instead of `src`
+- Updated image extraction logic to use correct property names: `images[0].originalSrc` for URL and `images[0].altText` for alt text
+- Added fallback chain for different possible data structures
+- Added debugging to identify the actual data structure returned by resource picker
+
+**Files**: `app/components/ProductPicker.jsx:25-35`, `app/routes/app.create-bundle.jsx:230-240`
+
+---
+
 ## 🛠 Tech Stack
 - **Framework**: Remix
 - **Database**: SQLite with Prisma ORM

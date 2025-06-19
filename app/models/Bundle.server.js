@@ -6,6 +6,7 @@ export async function getBundle(id, graphql) {
     include: {
       shop: true,
       bundleProducts: true,
+      targetProduct: true,
     },
   });
 
@@ -22,6 +23,7 @@ export async function getBundles(shop, graphql) {
     include: {
       shop: true,
       bundleProducts: true,
+      targetProduct: true,
     },
     orderBy: { createdAt: "desc" },
   });
@@ -153,5 +155,11 @@ export async function updateBundle(id, data) {
       discountedPrice: data.discountedPrice || 0,
       isActive: data.isActive !== false,
     },
+  });
+}
+
+export async function deleteBundle(id) {
+  return await db.bundle.delete({
+    where: { id },
   });
 }
