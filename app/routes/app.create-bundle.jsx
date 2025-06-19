@@ -8,9 +8,6 @@ import {
   Button,
   Select,
   Banner,
-  InlineStack,
-  Thumbnail,
-  BlockStack,
   InlineError,
 } from "@shopify/polaris";
 import { useState, useEffect } from "react";
@@ -18,6 +15,9 @@ import { useLoaderData, useActionData, useNavigate, useSubmit } from "@remix-run
 import { authenticate } from "../shopify.server";
 import { getBundle, createBundle, updateBundle, validateBundle } from "../models/Bundle.server";
 import { json } from "@remix-run/node";
+import ImagePicker from "../components/ImagePicker";
+import ProductPicker from "../components/ProductPicker";
+import db from "../db.server";
 
 export async function loader({ request, params }) {
   const { admin } = await authenticate.admin(request);
@@ -43,25 +43,163 @@ export async function loader({ request, params }) {
 }
 
 export async function action({ request, params }) {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   
   const formData = await request.formData();
+  
+  // Ensure the shop exists in the database
+  try {
+    await db.shop.upsert({
+      where: { id: session.shop },
+      update: {},
+      create: {
+        id: session.shop,
+        name: session.shop,
+        accessToken: session.accessToken,
+      },
+    });
+  } catch (error) {
+    return { errors: { general: "Failed to initialize shop data. Please try again." } };
+  }
+  
+  // Handle image file upload if present
+  let imageUrl = formData.get("imageUrl");
+  let imageAlt = formData.get("imageAlt");
+  
+  const imageFile = formData.get("imageFile");
+  
+  if (imageFile && imageFile instanceof File) {
+    try {
+      // Upload file to Shopify
+      const uploadResponse = await admin.graphql(
+        `#graphql
+        mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
+          stagedUploadsCreate(input: $input) {
+            stagedTargets {
+              resourceUrl
+              url
+              parameters {
+                name
+                value
+              }
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }`,
+        {
+          variables: {
+            input: [
+              {
+                filename: imageFile.name,
+                mimeType: imageFile.type,
+                resource: "FILE",
+              },
+            ],
+          },
+        }
+      );
+
+      const uploadData = await uploadResponse.json();
+      
+      if (uploadData.data?.stagedUploadsCreate?.userErrors?.length > 0) {
+        return { errors: { general: "Failed to upload image: " + uploadData.data.stagedUploadsCreate.userErrors[0].message } };
+      }
+      
+      const stagedTarget = uploadData.data.stagedUploadsCreate.stagedTargets[0];
+
+      if (stagedTarget) {
+        // Upload the file to the staged URL
+        const uploadFormData = new FormData();
+        stagedTarget.parameters.forEach(({ name, value }) => {
+          uploadFormData.append(name, value);
+        });
+        uploadFormData.append("file", imageFile);
+
+        const fileUploadResponse = await fetch(stagedTarget.url, {
+          method: "POST",
+          body: uploadFormData,
+        });
+
+        if (fileUploadResponse.ok) {
+          // Create a file record in Shopify
+          const fileCreateResponse = await admin.graphql(
+            `#graphql
+            mutation fileCreate($files: [FileCreateInput!]!) {
+              fileCreate(files: $files) {
+                files {
+                  id
+                  fileStatus
+                  preview {
+                    image {
+                      url
+                    }
+                  }
+                }
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }`,
+            {
+              variables: {
+                files: [
+                  {
+                    originalSource: stagedTarget.resourceUrl,
+                    contentType: "IMAGE",
+                  },
+                ],
+              },
+            }
+          );
+
+          const fileData = await fileCreateResponse.json();
+          
+          if (fileData.data?.fileCreate?.userErrors?.length > 0) {
+            return { errors: { general: "Failed to create file: " + fileData.data.fileCreate.userErrors[0].message } };
+          }
+          
+          const file = fileData.data.fileCreate.files[0];
+
+          if (file?.preview?.image?.url) {
+            imageUrl = file.preview.image.url;
+            imageAlt = imageFile.name;
+          }
+        }
+      }
+    } catch (error) {
+      return { errors: { general: "Failed to upload image. Please try again." } };
+    }
+  }
+
   const bundleData = {
     title: formData.get("title"),
     description: formData.get("description"),
-    imageUrl: formData.get("imageUrl"),
+    imageUrl: imageUrl,
+    imageAlt: imageAlt,
+    imageSource: formData.get("imageSource"),
+    sourceId: formData.get("sourceId"),
     discountedPrice: parseFloat(formData.get("discountedPrice") || "0"),
     isActive: formData.get("isActive") === "true",
-    targetProductId: formData.get("targetProductId"),
-    targetProductVariantId: formData.get("targetProductVariantId"),
-    targetProductHandle: formData.get("targetProductHandle"),
-    targetProductTitle: formData.get("targetProductTitle"),
-    targetProductImage: formData.get("targetProductImage"),
-    targetProductAlt: formData.get("targetProductAlt"),
     shopId: session.shop,
+    // Create the targetProduct relation properly
+    targetProduct: {
+      create: {
+        productId: formData.get("targetProductId") || "",
+        productHandle: formData.get("targetProductHandle") || "",
+        productVariantId: formData.get("targetProductVariantId") || "",
+        productTitle: formData.get("targetProductTitle") || "",
+        productImage: formData.get("targetProductImage") || "",
+        productAlt: formData.get("targetProductAlt") || "",
+      }
+    }
   };
 
   const validation = validateBundle(bundleData);
+  
   if (!validation.isValid) {
     return { errors: validation.errors };
   }
@@ -76,8 +214,7 @@ export async function action({ request, params }) {
     
     return { success: true };
   } catch (error) {
-    console.error("Error saving bundle:", error);
-    return { errors: { general: "Failed to save bundle. Please try again." } };
+    return { errors: { general: `Failed to save bundle: ${error.message}` } };
   }
 }
 
@@ -96,21 +233,28 @@ export default function CreateBundle() {
   });
 
   const [selectedProduct, setSelectedProduct] = useState({
-    productId: bundle?.targetProducts ? JSON.parse(bundle.targetProducts)[0] : "",
-    productTitle: bundle?.enrichedProducts?.[0]?.title || "",
-    productHandle: bundle?.enrichedProducts?.[0]?.handle || "",
-    productImage: bundle?.enrichedProducts?.[0]?.images?.edges?.[0]?.node?.url || "",
-    productAlt: bundle?.enrichedProducts?.[0]?.images?.edges?.[0]?.node?.altText || "",
-    productVariantId: bundle?.enrichedProducts?.[0]?.variants?.edges?.[0]?.node?.id || "",
+    productId: bundle?.targetProduct || "",
+    productTitle: bundle?.enrichedProduct?.title || "",
+    productHandle: bundle?.enrichedProduct?.handle || "",
+    productImage: bundle?.enrichedProduct?.media?.edges?.[0]?.node?.image?.url || "",
+    productAlt: bundle?.enrichedProduct?.media?.edges?.[0]?.node?.image?.altText || "",
+    productVariantId: bundle?.enrichedProduct?.variants?.edges?.[0]?.node?.id || "",
   });
 
-  const handleSubmit = (e) => {
+  const [selectedImage, setSelectedImage] = useState({
+    imageId: "",
+    imageUrl: bundle?.imageUrl || "",
+    imageAlt: bundle?.imageAlt || "",
+    imageSource: bundle?.imageSource || "",
+    sourceId: bundle?.sourceId || "",
+  });
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     const formDataToSubmit = new FormData();
     formDataToSubmit.append("title", formData.title);
     formDataToSubmit.append("description", formData.description);
-    formDataToSubmit.append("imageUrl", formData.imageUrl);
     formDataToSubmit.append("discountedPrice", formData.discountedPrice);
     formDataToSubmit.append("isActive", formData.isActive.toString());
     formDataToSubmit.append("targetProductId", selectedProduct.productId);
@@ -120,30 +264,26 @@ export default function CreateBundle() {
     formDataToSubmit.append("targetProductImage", selectedProduct.productImage);
     formDataToSubmit.append("targetProductAlt", selectedProduct.productAlt);
     
+    // Handle image upload if it's a file
+    if (selectedImage.file) {
+      formDataToSubmit.append("imageFile", selectedImage.file);
+      formDataToSubmit.append("imageSource", "upload");
+    } else {
+      formDataToSubmit.append("imageUrl", selectedImage.imageUrl);
+      formDataToSubmit.append("imageAlt", selectedImage.imageAlt);
+      formDataToSubmit.append("imageSource", selectedImage.imageSource);
+      formDataToSubmit.append("sourceId", selectedImage.sourceId);
+    }
+    
     submit(formDataToSubmit, { method: "post" });
   };
 
-  const selectTargetProduct = async () => {
-    try {
-      const product = await window.shopify.resourcePicker({
-        type: "product",
-        action: "select",
-      });
+  const handleImageSelect = (imageData) => {
+    setSelectedImage(imageData);
+  };
 
-      if (product) {
-        const { id, title, handle, images, variants } = product[0];
-        setSelectedProduct({
-          productId: id,
-          productTitle: title,
-          productHandle: handle,
-          productImage: images?.[0]?.src || "",
-          productAlt: images?.[0]?.alt || "",
-          productVariantId: variants?.[0]?.id || "",
-        });
-      }
-    } catch (error) {
-      console.error("Error selecting product:", error);
-    }
+  const handleProductSelect = (productData) => {
+    setSelectedProduct(productData);
   };
 
   const handleCancel = () => {
@@ -191,11 +331,10 @@ export default function CreateBundle() {
                   autoComplete="off"
                 />
 
-                <TextField
-                  label="Image URL"
-                  value={formData.imageUrl}
-                  onChange={(value) => setFormData({ ...formData, imageUrl: value })}
-                  autoComplete="off"
+                <ImagePicker
+                  selectedImage={selectedImage}
+                  onImageSelect={handleImageSelect}
+                  label="Bundle Image"
                 />
 
                 <TextField
@@ -218,40 +357,15 @@ export default function CreateBundle() {
                   onChange={(value) => setFormData({ ...formData, isActive: value === "true" })}
                 />
 
-                <BlockStack gap="400">
-                  <div>
-                    <div style={{ marginBottom: "8px" }}>
-                      <strong>Target Product</strong>
-                      <span style={{ color: "red" }}> *</span>
-                    </div>
-                    
-                    {selectedProduct.productId ? (
-                      <InlineStack gap="400" align="start">
-                        <Thumbnail
-                          source={selectedProduct.productImage || ""}
-                          alt={selectedProduct.productAlt || "Product image"}
-                          size="medium"
-                        />
-                        <BlockStack gap="200">
-                          <div>
-                            <strong>{selectedProduct.productTitle}</strong>
-                          </div>
-                          <Button onClick={selectTargetProduct} variant="secondary" size="slim">
-                            Change product
-                          </Button>
-                        </BlockStack>
-                      </InlineStack>
-                    ) : (
-                      <Button onClick={selectTargetProduct} variant="secondary">
-                        Select target product
-                      </Button>
-                    )}
-                    
-                    {errors.targetProductId && (
-                      <InlineError message={errors.targetProductId} />
-                    )}
-                  </div>
-                </BlockStack>
+                <ProductPicker
+                  selectedProduct={selectedProduct}
+                  onProductSelect={handleProductSelect}
+                  label="Target Product"
+                />
+
+                {errors.targetProductId && (
+                  <InlineError message={errors.targetProductId} />
+                )}
 
                 <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                   <Button onClick={handleCancel}>Cancel</Button>

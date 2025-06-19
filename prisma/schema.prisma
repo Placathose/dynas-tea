@@ -44,7 +44,10 @@ model Bundle {
   id              Int      @id @default(autoincrement())
   title           String
   description     String?
-  imageUrl        String?
+  imageUrl        String? // URL of selected image
+  imageAlt        String? // Alt text for accessibility
+  imageSource     String? // "product", "collection", "file"
+  sourceId        String? // ID of source (product/collection ID)
   originalPrice   Float
   discountedPrice Float
   isActive        Boolean  @default(true)

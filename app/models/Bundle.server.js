@@ -32,67 +32,68 @@ export async function getBundles(shop, graphql) {
 }
 
 export async function supplementBundleData(bundle, graphql) {
-  if (!bundle.targetProducts) {
+  if (!bundle.targetProduct) {
     return bundle;
   }
 
   try {
-    const targetProductIds = JSON.parse(bundle.targetProducts);
+    const targetProductId = bundle.targetProduct.productId;
     
-    if (!targetProductIds.length) {
+    if (!targetProductId) {
       return bundle;
     }
 
-    const enrichedProducts = await Promise.all(
-      targetProductIds.map(async (productId) => {
-        try {
-          const response = await graphql(
-            `#graphql
-            query getProduct($id: ID!) {
-              product(id: $id) {
-                id
-                title
-                handle
-                images(first: 1) {
-                  edges {
-                    node {
+    try {
+      const response = await graphql(
+        `#graphql
+        query getProduct($id: ID!) {
+          product(id: $id) {
+            id
+            title
+            handle
+            media(first: 1) {
+              edges {
+                node {
+                  id
+                  ... on MediaImage {
+                    image {
                       id
                       url
                       altText
                     }
                   }
                 }
-                variants(first: 1) {
-                  edges {
-                    node {
-                      id
-                      title
-                      price
-                    }
-                  }
+              }
+            }
+            variants(first: 1) {
+              edges {
+                node {
+                  id
+                  title
+                  price
                 }
               }
-            }`,
-            {
-              variables: { id: productId },
             }
-          );
-
-          const responseJson = await response.json();
-          return responseJson.data?.product;
-        } catch (error) {
-          console.error(`Error fetching product ${productId}:`, error);
-          return null;
+          }
+        }`,
+        {
+          variables: { id: targetProductId },
         }
-      })
-    );
+      );
 
-    return {
-      ...bundle,
-      enrichedProducts: enrichedProducts.filter(Boolean),
-    };
+      const responseJson = await response.json();
+      const product = responseJson.data?.product;
+
+      return {
+        ...bundle,
+        enrichedProduct: product,
+      };
+    } catch (error) {
+      console.error(`Error fetching product ${targetProductId}:`, error);
+      return bundle;
+    }
   } catch (error) {
-    console.error("Error parsing target products:", error);
+    console.error("Error parsing target product:", error);
     return bundle;
   }
 }
@@ -104,7 +105,7 @@ export function validateBundle(data) {
     errors.title = "Title is required";
   }
 
-  if (!data.targetProductId) {
+  if (!data.targetProduct || !data.targetProduct.create || !data.targetProduct.create.productId) {
     errors.targetProductId = "Target product is required";
   }
 
@@ -115,35 +116,42 @@ export function validateBundle(data) {
 }
 
 export async function createBundle(data) {
-  const targetProducts = JSON.stringify([data.targetProductId]);
-  
   return await db.bundle.create({
     data: {
       shopId: data.shopId,
       title: data.title,
       description: data.description || "",
       imageUrl: data.imageUrl || "",
+      imageAlt: data.imageAlt || "",
+      imageSource: data.imageSource || "",
+      sourceId: data.sourceId || "",
+      targetProduct: data.targetProduct,
       originalPrice: data.originalPrice || 0,
       discountedPrice: data.discountedPrice || 0,
       isActive: data.isActive !== false,
-      targetProducts,
     },
   });
 }
 
 export async function updateBundle(id, data) {
-  const targetProducts = JSON.stringify([data.targetProductId]);
-  
   return await db.bundle.update({
     where: { id },
     data: {
       title: data.title,
       description: data.description || "",
       imageUrl: data.imageUrl || "",
+      imageAlt: data.imageAlt || "",
+      imageSource: data.imageSource || "",
+      sourceId: data.sourceId || "",
+      targetProduct: data.targetProduct ? {
+        upsert: {
+          create: data.targetProduct.create,
+          update: data.targetProduct.create,
+        }
+      } : undefined,
       originalPrice: data.originalPrice || 0,
       discountedPrice: data.discountedPrice || 0,
       isActive: data.isActive !== false,
-      targetProducts,
     },
   });
 }
