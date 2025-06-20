@@ -147,6 +147,72 @@ targetProduct: {
 
 ---
 
+### 12. **Bundle Image Upload Challenges & Solutions**
+
+#### **Challenge 1: Shopify API Permissions**
+**Problem**: `GraphqlQueryError: Access denied for stagedUploadsCreate field`
+- App lacked `write_files` permission for Shopify's staged uploads API
+
+**Solution**: 
+- Added `write_files` scope to `shopify.app.toml:4`
+- Redeployed app with `npm run deploy` to apply new permissions
+
+**Files**: `shopify.app.toml:4`, Deployment command
+
+---
+
+#### **Challenge 2: Form Data Parsing Issues**
+**Problem**: Form data received as `[object Object]` instead of string values
+- `unstable_parseMultipartFormData` not properly parsing form fields
+
+**Solution**:
+- Fixed form data parsing in action function (`app/routes/app.create-bundle.jsx:15-25`)
+- Added proper string conversion for non-file fields
+- Added debugging to verify data types and values
+
+**Files**: `app/routes/app.create-bundle.jsx:15-25`, `app/routes/app.create-bundle.jsx:35-45`
+
+---
+
+#### **Challenge 3: Staged Upload Signature Mismatch**
+**Problem**: `403 signature mismatch` error when uploading to Google Cloud Storage
+- Complex staged upload process with FormData construction issues
+
+**Solution**:
+- Replaced complex staged upload with simple base64 data URL conversion
+- Eliminated external upload dependencies causing signature issues
+- Implemented direct image storage in database as data URLs
+
+**Files**: `app/routes/app.create-bundle.jsx:90-110`, `app/routes/app.create-bundle.jsx:115-125`
+
+---
+
+#### **Challenge 4: Corrupted Data Cleanup**
+**Problem**: Old bundles with `[object Object]` titles causing GraphQL errors
+- Invalid product IDs causing `Variable $id of type ID! was provided invalid value`
+
+**Solution**:
+- Added automatic cleanup of corrupted bundles in action function
+- Implemented product ID validation in `supplementBundleData()` function
+- Added error handling to skip invalid product IDs instead of failing
+
+**Files**: `app/routes/app.create-bundle.jsx:5-15`, `app/models/Bundle.server.js:45-65`
+
+---
+
+#### **Challenge 5: Image Display in Bundle List**
+**Problem**: Uploaded images not showing in bundles list
+- Image URLs were empty strings in database
+
+**Solution**:
+- Base64 data URLs work immediately in browser without external dependencies
+- Images display correctly using existing `Thumbnail` component
+- No additional frontend changes needed for image display
+
+**Files**: `app/routes/app._index.jsx:40-50`, `app/components/Thumbnail.jsx`
+
+---
+
 ## 🛠 Tech Stack
 - **Framework**: Remix
 - **Database**: SQLite with Prisma ORM

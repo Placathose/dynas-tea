@@ -28,6 +28,13 @@ export async function getBundles(shop, graphql) {
     orderBy: { createdAt: "desc" },
   });
 
+  console.log("Raw bundles from database:", bundles.map(b => ({
+    id: b.id,
+    title: b.title,
+    imageUrl: b.imageUrl,
+    imageAlt: b.imageAlt
+  })));
+
   return await Promise.all(
     bundles.map((bundle) => supplementBundleData(bundle, graphql))
   );
@@ -42,6 +49,12 @@ export async function supplementBundleData(bundle, graphql) {
     const targetProductId = bundle.targetProduct.productId;
     
     if (!targetProductId) {
+      return bundle;
+    }
+
+    // Validate that the product ID is a proper Shopify GID format
+    if (typeof targetProductId !== 'string' || !targetProductId.startsWith('gid://shopify/Product/')) {
+      console.log(`Skipping invalid product ID: ${targetProductId}`);
       return bundle;
     }
 
@@ -118,7 +131,13 @@ export function validateBundle(data) {
 }
 
 export async function createBundle(data) {
-  return await db.bundle.create({
+  console.log("Creating bundle with data:", {
+    title: data.title,
+    imageUrl: data.imageUrl,
+    imageAlt: data.imageAlt
+  });
+
+  const result = await db.bundle.create({
     data: {
       shopId: data.shopId,
       title: data.title,
@@ -133,6 +152,15 @@ export async function createBundle(data) {
       isActive: data.isActive !== false,
     },
   });
+
+  console.log("Bundle created:", {
+    id: result.id,
+    title: result.title,
+    imageUrl: result.imageUrl,
+    imageAlt: result.imageAlt
+  });
+
+  return result;
 }
 
 export async function updateBundle(id, data) {

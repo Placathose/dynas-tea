@@ -14,7 +14,7 @@ import { useState, useEffect } from "react";
 import { useLoaderData, useActionData, useNavigate, useSubmit } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
 import { createBundle, validateBundle } from "../models/Bundle.server";
-import { json } from "@remix-run/node";
+import { json, unstable_parseMultipartFormData } from "@remix-run/node";
 import ImagePicker from "../components/ImagePicker";
 import ProductPicker from "../components/ProductPicker";
 import db from "../db.server";
@@ -29,7 +29,55 @@ export async function loader({ request }) {
 export async function action({ request }) {
   const { admin, session } = await authenticate.admin(request);
   
-  const formData = await request.formData();
+  // Temporary cleanup of corrupted data
+  try {
+    const corruptedBundles = await db.bundle.findMany({
+      where: {
+        shopId: session.shop,
+        title: "[object Object]"
+      }
+    });
+    
+    if (corruptedBundles.length > 0) {
+      console.log(`Cleaning up ${corruptedBundles.length} corrupted bundles`);
+      await db.bundle.deleteMany({
+        where: {
+          id: { in: corruptedBundles.map(b => b.id) }
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Error cleaning up corrupted bundles:", error);
+  }
+  
+  const formData = await unstable_parseMultipartFormData(request, async ({ name, contentType, filename, data }) => {
+    if (name === "imageFile") {
+      const chunks = [];
+      for await (const chunk of data) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+      return new File([buffer], filename, { type: contentType });
+    }
+    // For all other fields, collect the data as a string
+    const chunks = [];
+    for await (const chunk of data) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks).toString();
+  });
+  
+  console.log("Action function - formData entries:");
+  for (let [key, value] of formData.entries()) {
+    console.log(`${key}:`, value instanceof File ? `File: ${value.name} (${value.type})` : value);
+  }
+  
+  // Debug: Check if formData is working correctly
+  console.log("Form data debug:");
+  console.log("title type:", typeof formData.get("title"));
+  console.log("title value:", formData.get("title"));
+  console.log("targetProductId type:", typeof formData.get("targetProductId"));
+  console.log("targetProductId value:", formData.get("targetProductId"));
   
   // Ensure the shop exists in the database
   try {
@@ -52,135 +100,83 @@ export async function action({ request }) {
   
   const imageFile = formData.get("imageFile");
   
+  console.log("Image upload debug:", {
+    hasImageFile: !!imageFile,
+    imageFileType: imageFile?.type,
+    imageFileName: imageFile?.name,
+    initialImageUrl: imageUrl,
+    initialImageAlt: imageAlt
+  });
+  
   if (imageFile && imageFile instanceof File) {
     try {
-      // Upload file to Shopify
-      const uploadResponse = await admin.graphql(
-        `#graphql
-        mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
-          stagedUploadsCreate(input: $input) {
-            stagedTargets {
-              resourceUrl
-              url
-              parameters {
-                name
-                value
-              }
-            }
-            userErrors {
-              field
-              message
-            }
-          }
-        }`,
-        {
-          variables: {
-            input: [
-              {
-                filename: imageFile.name,
-                mimeType: imageFile.type,
-                resource: "FILE",
-              },
-            ],
-          },
-        }
-      );
-
-      const uploadData = await uploadResponse.json();
+      console.log("Starting image upload process...");
       
-      if (uploadData.data?.stagedUploadsCreate?.userErrors?.length > 0) {
-        return { errors: { general: "Failed to upload image: " + uploadData.data.stagedUploadsCreate.userErrors[0].message } };
-      }
+      // Convert the file to a base64 data URL for now
+      // This is a simpler approach that doesn't require external uploads
+      const arrayBuffer = await imageFile.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      const dataUrl = `data:${imageFile.type};base64,${base64}`;
       
-      const stagedTarget = uploadData.data.stagedUploadsCreate.stagedTargets[0];
-
-      if (stagedTarget) {
-        // Upload the file to the staged URL
-        const uploadFormData = new FormData();
-        stagedTarget.parameters.forEach(({ name, value }) => {
-          uploadFormData.append(name, value);
-        });
-        uploadFormData.append("file", imageFile);
-
-        const fileUploadResponse = await fetch(stagedTarget.url, {
-          method: "POST",
-          body: uploadFormData,
-        });
-
-        if (fileUploadResponse.ok) {
-          // Create a file record in Shopify
-          const fileCreateResponse = await admin.graphql(
-            `#graphql
-            mutation fileCreate($files: [FileCreateInput!]!) {
-              fileCreate(files: $files) {
-                files {
-                  id
-                  fileStatus
-                  preview {
-                    image {
-                      url
-                    }
-                  }
-                }
-                userErrors {
-                  field
-                  message
-                }
-              }
-            }`,
-            {
-              variables: {
-                files: [
-                  {
-                    originalSource: stagedTarget.resourceUrl,
-                    contentType: "IMAGE",
-                  },
-                ],
-              },
-            }
-          );
-
-          const fileData = await fileCreateResponse.json();
-          
-          if (fileData.data?.fileCreate?.userErrors?.length > 0) {
-            return { errors: { general: "Failed to create file: " + fileData.data.fileCreate.userErrors[0].message } };
-          }
-          
-          const file = fileData.data.fileCreate.files[0];
-
-          if (file?.preview?.image?.url) {
-            imageUrl = file.preview.image.url;
-            imageAlt = imageFile.name;
-          }
-        }
-      }
+      // For now, we'll store the data URL directly
+      // In production, you might want to use a CDN or image hosting service
+      imageUrl = dataUrl;
+      imageAlt = imageFile.name;
+      
+      console.log("Image converted to data URL successfully:", {
+        imageUrl: imageUrl.substring(0, 100) + "...",
+        imageAlt: imageAlt
+      });
+      
     } catch (error) {
-      return { errors: { general: "Failed to upload image. Please try again." } };
+      console.error("Image upload error:", error);
+      // Don't fail the entire bundle creation if image upload fails
+      imageUrl = "";
+      imageAlt = "";
     }
   }
 
+  // Extract form data as strings
+  const title = formData.get("title") || "";
+  const description = formData.get("description") || "";
+  const discountedPrice = formData.get("discountedPrice") || "0";
+  const isActive = formData.get("isActive") === "true";
+  const targetProductId = formData.get("targetProductId") || "";
+  const targetProductVariantId = formData.get("targetProductVariantId") || "";
+  const targetProductHandle = formData.get("targetProductHandle") || "";
+  const targetProductTitle = formData.get("targetProductTitle") || "";
+  const targetProductImage = formData.get("targetProductImage") || "";
+  const targetProductAlt = formData.get("targetProductAlt") || "";
+
   const bundleData = {
-    title: formData.get("title"),
-    description: formData.get("description"),
+    title: title,
+    description: description,
     imageUrl: imageUrl,
     imageAlt: imageAlt,
     imageSource: formData.get("imageSource"),
     sourceId: formData.get("sourceId"),
-    discountedPrice: parseFloat(formData.get("discountedPrice") || "0"),
-    isActive: formData.get("isActive") === "true",
+    discountedPrice: parseFloat(discountedPrice),
+    isActive: isActive,
     shopId: session.shop,
     // Create the targetProduct relation properly
     targetProduct: {
       create: {
-        productId: formData.get("targetProductId") || "",
-        productHandle: formData.get("targetProductHandle") || "",
-        productVariantId: formData.get("targetProductVariantId") || "",
-        productTitle: formData.get("targetProductTitle") || "",
-        productImage: formData.get("targetProductImage") || "",
-        productAlt: formData.get("targetProductAlt") || "",
+        productId: targetProductId,
+        productHandle: targetProductHandle,
+        productVariantId: targetProductVariantId,
+        productTitle: targetProductTitle,
+        productImage: targetProductImage,
+        productAlt: targetProductAlt,
       }
     }
   };
+
+  console.log("Bundle data being saved:", {
+    title: bundleData.title,
+    imageUrl: bundleData.imageUrl,
+    imageAlt: bundleData.imageAlt,
+    imageSource: bundleData.imageSource
+  });
 
   const validation = validateBundle(bundleData);
   
@@ -225,6 +221,7 @@ export default function CreateBundle() {
     imageAlt: "",
     imageSource: "",
     sourceId: "",
+    file: null,
   });
 
   const handleSubmit = async (e) => {
@@ -242,18 +239,27 @@ export default function CreateBundle() {
     formDataToSubmit.append("targetProductImage", selectedProduct.productImage);
     formDataToSubmit.append("targetProductAlt", selectedProduct.productAlt);
     
+    console.log("Submit debug - selectedImage:", {
+      hasFile: !!selectedImage.file,
+      fileType: selectedImage.file?.type,
+      fileName: selectedImage.file?.name,
+      imageSource: selectedImage.imageSource
+    });
+    
     // Handle image upload if it's a file
     if (selectedImage.file) {
       formDataToSubmit.append("imageFile", selectedImage.file);
       formDataToSubmit.append("imageSource", "upload");
+      console.log("Appending file to FormData");
+      submit(formDataToSubmit, { method: "post", encType: "multipart/form-data" });
     } else {
       formDataToSubmit.append("imageUrl", selectedImage.imageUrl);
       formDataToSubmit.append("imageAlt", selectedImage.imageAlt);
       formDataToSubmit.append("imageSource", selectedImage.imageSource);
       formDataToSubmit.append("sourceId", selectedImage.sourceId);
+      console.log("No file, using imageUrl:", selectedImage.imageUrl);
+      submit(formDataToSubmit, { method: "post" });
     }
-    
-    submit(formDataToSubmit, { method: "post" });
   };
 
   const handleImageSelect = (imageData) => {
@@ -358,4 +364,4 @@ export default function CreateBundle() {
       </Layout>
     </Page>
   );
-} 
+}

@@ -61,6 +61,17 @@ export default function Index() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [bundleToDelete, setBundleToDelete] = useState(null);
 
+  // Debug: Log bundle data to see what's being returned
+  console.log("Bundles data:", bundles);
+  bundles.forEach((bundle, index) => {
+    console.log(`Bundle ${index + 1}:`, {
+      id: bundle.id,
+      title: bundle.title,
+      imageUrl: bundle.imageUrl,
+      imageAlt: bundle.imageAlt
+    });
+  });
+
   const handleEdit = (bundleId) => {
     navigate(`/app/edit-bundle/${bundleId}`);
   };
