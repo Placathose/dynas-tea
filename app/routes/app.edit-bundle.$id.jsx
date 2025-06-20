@@ -13,7 +13,7 @@ import {
 import { useState, useEffect } from "react";
 import { useLoaderData, useActionData, useNavigate, useSubmit } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
-import { getBundle, createBundle, updateBundle, validateBundle } from "../models/Bundle.server";
+import { getBundle, updateBundle, validateBundle } from "../models/Bundle.server";
 import { json } from "@remix-run/node";
 import ImagePicker from "../components/ImagePicker";
 import ProductPicker from "../components/ProductPicker";
@@ -215,7 +215,7 @@ export async function action({ request, params }) {
 }
 
 export default function EditBundle() {
-  const { bundle, isEditing } = useLoaderData();
+  const { bundle } = useLoaderData();
   const actionData = useActionData();
   const navigate = useNavigate();
   const submit = useSubmit();
@@ -279,17 +279,12 @@ export default function EditBundle() {
   };
 
   const handleProductSelect = (productData) => {
-    console.log("EditBundle - handleProductSelect called with:", productData);
     setSelectedProduct(productData);
   };
 
   const handleCancel = () => {
     navigate("/app");
   };
-
-  // Debug logging for selectedProduct state
-  console.log("EditBundle - selectedProduct state:", selectedProduct);
-  console.log("EditBundle - bundle data:", bundle);
 
   useEffect(() => {
     if (actionData?.success) {

@@ -6,11 +6,6 @@ export default function ProductPicker({
   label = "Product",
   size = "medium" 
 }) {
-  // Debug logging
-  console.log("ProductPicker - selectedProduct:", selectedProduct);
-  console.log("ProductPicker - productImage:", selectedProduct?.productImage);
-  console.log("ProductPicker - productId:", selectedProduct?.productId);
-
   const selectProduct = async () => {
     try {
       const product = await window.shopify.resourcePicker({
@@ -19,13 +14,7 @@ export default function ProductPicker({
       });
 
       if (product) {
-        console.log("Full resource picker response:", product);
-        console.log("First product object:", product[0]);
-        
         const { id, title, handle, images, variants } = product[0];
-        console.log("Resource picker product data:", product[0]);
-        console.log("Images from resource picker:", images);
-        console.log("Image structure:", images?.[0]);
         
         // Try different possible image paths
         let productImage = "";
@@ -36,9 +25,6 @@ export default function ProductPicker({
           productAlt = images[0].altText || images[0].alt || images[0].image?.altText || "";
         }
         
-        console.log("Extracted productImage:", productImage);
-        console.log("Extracted productAlt:", productAlt);
-        
         const productData = {
           productId: id,
           productTitle: title,
@@ -48,7 +34,6 @@ export default function ProductPicker({
           productVariantId: variants?.[0]?.id || "",
         };
         
-        console.log("Processed product data:", productData);
         onProductSelect(productData);
       }
     } catch (error) {
@@ -103,15 +88,6 @@ export default function ProductPicker({
           <Button onClick={selectProduct} variant="secondary">
             Select {label.toLowerCase()}
           </Button>
-        )}
-        
-        {/* Debug info */}
-        {selectedProduct?.productId && (
-          <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
-            <div>Debug - Product ID: {selectedProduct.productId}</div>
-            <div>Debug - Product Image: {selectedProduct.productImage || 'NO IMAGE'}</div>
-            <div>Debug - Product Alt: {selectedProduct.productAlt || 'NO ALT'}</div>
-          </div>
         )}
       </div>
     </BlockStack>

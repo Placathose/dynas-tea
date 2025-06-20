@@ -13,36 +13,20 @@ import {
 import { useState, useEffect } from "react";
 import { useLoaderData, useActionData, useNavigate, useSubmit } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
-import { getBundle, createBundle, updateBundle, validateBundle } from "../models/Bundle.server";
+import { createBundle, validateBundle } from "../models/Bundle.server";
 import { json } from "@remix-run/node";
 import ImagePicker from "../components/ImagePicker";
 import ProductPicker from "../components/ProductPicker";
 import db from "../db.server";
 
-export async function loader({ request, params }) {
+export async function loader({ request }) {
   const { admin } = await authenticate.admin(request);
   
-  // If no ID is provided, this is a create route
-  if (!params.id || params.id === "new") {
-    return json({ bundle: null, isEditing: false });
-  }
-  
-  // If ID is provided, try to fetch the bundle
-  try {
-    const bundle = await getBundle(parseInt(params.id), admin.graphql);
-    if (!bundle) {
-      throw new Response("Bundle not found", { status: 404 });
-    }
-    return json({ bundle, isEditing: true });
-  } catch (error) {
-    if (error instanceof Response) {
-      throw error;
-    }
-    throw new Response("Bundle not found", { status: 404 });
-  }
+  // This is always a create route
+  return json({ bundle: null, isEditing: false });
 }
 
-export async function action({ request, params }) {
+export async function action({ request }) {
   const { admin, session } = await authenticate.admin(request);
   
   const formData = await request.formData();
@@ -205,13 +189,7 @@ export async function action({ request, params }) {
   }
 
   try {
-    // If no ID is provided, this is a create route
-    if (!params.id || params.id === "new") {
-      await createBundle(bundleData);
-    } else {
-      await updateBundle(parseInt(params.id), bundleData);
-    }
-    
+    await createBundle(bundleData);
     return { success: true };
   } catch (error) {
     return { errors: { general: `Failed to save bundle: ${error.message}` } };
@@ -219,34 +197,34 @@ export async function action({ request, params }) {
 }
 
 export default function CreateBundle() {
-  const { bundle, isEditing } = useLoaderData();
+  useLoaderData();
   const actionData = useActionData();
   const navigate = useNavigate();
   const submit = useSubmit();
   
   const [formData, setFormData] = useState({
-    title: bundle?.title || "",
-    description: bundle?.description || "",
-    imageUrl: bundle?.imageUrl || "",
-    discountedPrice: bundle?.discountedPrice?.toString() || "",
-    isActive: bundle?.isActive ?? true,
+    title: "",
+    description: "",
+    imageUrl: "",
+    discountedPrice: "",
+    isActive: true,
   });
 
   const [selectedProduct, setSelectedProduct] = useState({
-    productId: bundle?.targetProduct?.productId || "",
-    productTitle: bundle?.targetProduct?.productTitle || bundle?.enrichedProduct?.title || "",
-    productHandle: bundle?.targetProduct?.productHandle || bundle?.enrichedProduct?.handle || "",
-    productImage: bundle?.targetProduct?.productImage || bundle?.enrichedProduct?.media?.edges?.[0]?.node?.image?.url || "",
-    productAlt: bundle?.targetProduct?.productAlt || bundle?.enrichedProduct?.media?.edges?.[0]?.node?.image?.altText || "",
-    productVariantId: bundle?.targetProduct?.productVariantId || bundle?.enrichedProduct?.variants?.edges?.[0]?.node?.id || "",
+    productId: "",
+    productTitle: "",
+    productHandle: "",
+    productImage: "",
+    productAlt: "",
+    productVariantId: "",
   });
 
   const [selectedImage, setSelectedImage] = useState({
     imageId: "",
-    imageUrl: bundle?.imageUrl || "",
-    imageAlt: bundle?.imageAlt || "",
-    imageSource: bundle?.imageSource || "",
-    sourceId: bundle?.sourceId || "",
+    imageUrl: "",
+    imageAlt: "",
+    imageSource: "",
+    sourceId: "",
   });
 
   const handleSubmit = async (e) => {
@@ -283,17 +261,12 @@ export default function CreateBundle() {
   };
 
   const handleProductSelect = (productData) => {
-    console.log("CreateBundle - handleProductSelect called with:", productData);
     setSelectedProduct(productData);
   };
 
   const handleCancel = () => {
     navigate("/app");
   };
-
-  // Debug logging for selectedProduct state
-  console.log("CreateBundle - selectedProduct state:", selectedProduct);
-  console.log("CreateBundle - bundle data:", bundle);
 
   useEffect(() => {
     if (actionData?.success) {
@@ -305,7 +278,7 @@ export default function CreateBundle() {
 
   return (
     <Page
-      title={isEditing ? "Edit Bundle" : "Create Bundle"}
+      title="Create Bundle"
       backAction={{ content: "Bundles", onAction: handleCancel }}
     >
       <Layout>
@@ -375,7 +348,7 @@ export default function CreateBundle() {
                 <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                   <Button onClick={handleCancel}>Cancel</Button>
                   <Button variant="primary" submit>
-                    {isEditing ? "Save Changes" : "Create Bundle"}
+                    Create Bundle
                   </Button>
                 </div>
               </FormLayout>

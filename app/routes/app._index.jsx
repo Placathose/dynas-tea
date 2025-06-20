@@ -62,7 +62,7 @@ export default function Index() {
   const [bundleToDelete, setBundleToDelete] = useState(null);
 
   const handleEdit = (bundleId) => {
-    navigate(`/app/create-bundle/${bundleId}`);
+    navigate(`/app/edit-bundle/${bundleId}`);
   };
 
   const handleDelete = (bundle) => {
