@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "eb6249d0c0963d48ea010542e40815f1"
-application_url = "https://islands-middle-region-generic.trycloudflare.com"
+application_url = "https://tour-adverse-species-extras.trycloudflare.com"
 embedded = true
 name = "dynasTea"
 handle = "dynastea"
@@ -23,9 +23,9 @@ scopes = "write_products,read_products,write_files"
 
 [auth]
 redirect_urls = [
-  "https://islands-middle-region-generic.trycloudflare.com/auth/callback",
-  "https://islands-middle-region-generic.trycloudflare.com/auth/shopify/callback",
-  "https://islands-middle-region-generic.trycloudflare.com/api/auth/callback"
+  "https://tour-adverse-species-extras.trycloudflare.com/auth/callback",
+  "https://tour-adverse-species-extras.trycloudflare.com/auth/shopify/callback",
+  "https://tour-adverse-species-extras.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]

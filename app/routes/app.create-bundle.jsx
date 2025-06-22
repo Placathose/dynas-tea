@@ -9,6 +9,7 @@ import {
   Select,
   Banner,
   InlineError,
+  BlockStack,
 } from "@shopify/polaris";
 import { useState, useEffect } from "react";
 import { useLoaderData, useActionData, useNavigate, useSubmit } from "@remix-run/react";
@@ -17,6 +18,8 @@ import { createBundle, validateBundle } from "../models/Bundle.server";
 import { json, unstable_parseMultipartFormData } from "@remix-run/node";
 import ImagePicker from "../components/ImagePicker";
 import ProductPicker from "../components/ProductPicker";
+import BundleItemPicker from "../components/BundleItemPicker";
+import BundleItemList from "../components/BundleItemList";
 import db from "../db.server";
 
 export async function loader({ request }) {
@@ -148,6 +151,17 @@ export async function action({ request }) {
   const targetProductImage = formData.get("targetProductImage") || "";
   const targetProductAlt = formData.get("targetProductAlt") || "";
 
+  // Parse bundle items from form data
+  const bundleItemsData = formData.get("bundleItems");
+  let bundleItems = [];
+  if (bundleItemsData) {
+    try {
+      bundleItems = JSON.parse(bundleItemsData);
+    } catch (error) {
+      console.error("Error parsing bundle items:", error);
+    }
+  }
+
   const bundleData = {
     title: title,
     description: description,
@@ -168,6 +182,13 @@ export async function action({ request }) {
         productImage: targetProductImage,
         productAlt: targetProductAlt,
       }
+    },
+    // Create bundle products
+    bundleProducts: {
+      create: bundleItems.map(item => ({
+        productId: item.id,
+        quantity: item.quantity || 1,
+      }))
     }
   };
 
@@ -175,7 +196,8 @@ export async function action({ request }) {
     title: bundleData.title,
     imageUrl: bundleData.imageUrl,
     imageAlt: bundleData.imageAlt,
-    imageSource: bundleData.imageSource
+    imageSource: bundleData.imageSource,
+    bundleItemsCount: bundleItems.length
   });
 
   const validation = validateBundle(bundleData);
@@ -213,6 +235,7 @@ export default function CreateBundle() {
     productImage: "",
     productAlt: "",
     productVariantId: "",
+    price: "0",
   });
 
   const [selectedImage, setSelectedImage] = useState({
@@ -223,6 +246,8 @@ export default function CreateBundle() {
     sourceId: "",
     file: null,
   });
+
+  const [bundleItems, setBundleItems] = useState([]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -238,6 +263,9 @@ export default function CreateBundle() {
     formDataToSubmit.append("targetProductTitle", selectedProduct.productTitle);
     formDataToSubmit.append("targetProductImage", selectedProduct.productImage);
     formDataToSubmit.append("targetProductAlt", selectedProduct.productAlt);
+    
+    // Add bundle items to form data
+    formDataToSubmit.append("bundleItems", JSON.stringify(bundleItems));
     
     console.log("Submit debug - selectedImage:", {
       hasFile: !!selectedImage.file,
@@ -270,6 +298,26 @@ export default function CreateBundle() {
     setSelectedProduct(productData);
   };
 
+  const handleBundleItemsSelected = (products) => {
+    const newItems = products.map(product => ({
+      ...product,
+      quantity: 1
+    }));
+    setBundleItems(prev => [...prev, ...newItems]);
+  };
+
+  const handleQuantityChange = (productId, quantity) => {
+    setBundleItems(prev => 
+      prev.map(item => 
+        item.id === productId ? { ...item, quantity } : item
+      )
+    );
+  };
+
+  const handleRemoveItem = (productId) => {
+    setBundleItems(prev => prev.filter(item => item.id !== productId));
+  };
+
   const handleCancel = () => {
     navigate("/app");
   };
@@ -281,6 +329,12 @@ export default function CreateBundle() {
   }, [actionData, navigate]);
 
   const errors = actionData?.errors || {};
+
+  // Get existing product IDs for filtering
+  const existingProductIds = [
+    selectedProduct.productId,
+    ...bundleItems.map(item => item.id)
+  ].filter(Boolean);
 
   return (
     <Page
@@ -350,6 +404,20 @@ export default function CreateBundle() {
                 {errors.targetProductId && (
                   <InlineError message={errors.targetProductId} />
                 )}
+
+                <BlockStack gap="400">
+                  <BundleItemPicker
+                    onProductsSelected={handleBundleItemsSelected}
+                    existingProductIds={existingProductIds}
+                  />
+
+                  <BundleItemList
+                    bundleItems={bundleItems}
+                    onQuantityChange={handleQuantityChange}
+                    onRemoveItem={handleRemoveItem}
+                    targetProductPrice={selectedProduct.price}
+                  />
+                </BlockStack>
 
                 <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                   <Button onClick={handleCancel}>Cancel</Button>
