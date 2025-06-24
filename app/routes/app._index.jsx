@@ -15,6 +15,8 @@ import {
   EmptyState,
   Modal,
   Banner,
+  DataTable,
+  Collapsible,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -60,6 +62,7 @@ export default function Index() {
   const navigate = useNavigate();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [bundleToDelete, setBundleToDelete] = useState(null);
+  const [expandedBundles, setExpandedBundles] = useState(new Set());
 
   // Debug: Log bundle data to see what's being returned
   console.log("Bundles data:", bundles);
@@ -68,7 +71,18 @@ export default function Index() {
       id: bundle.id,
       title: bundle.title,
       imageUrl: bundle.imageUrl,
-      imageAlt: bundle.imageAlt
+      imageAlt: bundle.imageAlt,
+      originalPrice: bundle.originalPrice,
+      discountedPrice: bundle.discountedPrice,
+      savingsAmount: bundle.savingsAmount,
+      savingsPercentage: bundle.savingsPercentage,
+      bundleProducts: bundle.bundleProducts?.map(bp => ({
+        id: bp.id,
+        productId: bp.productId,
+        quantity: bp.quantity,
+        product: bp.product,
+        error: bp.error
+      }))
     });
   });
 
@@ -97,6 +111,16 @@ export default function Index() {
     setBundleToDelete(null);
   };
 
+  const toggleBundleExpansion = (bundleId) => {
+    const newExpanded = new Set(expandedBundles);
+    if (newExpanded.has(bundleId)) {
+      newExpanded.delete(bundleId);
+    } else {
+      newExpanded.add(bundleId);
+    }
+    setExpandedBundles(newExpanded);
+  };
+
   const actionMenuItems = (bundle) => [
     {
       content: "Edit",
@@ -106,6 +130,63 @@ export default function Index() {
       content: "Delete",
       onAction: () => handleDelete(bundle),
     },
+  ];
+
+  const getBundleProductsTableData = (bundleProducts) => {
+    if (!bundleProducts || bundleProducts.length === 0) {
+      return [];
+    }
+
+    return bundleProducts.map((product, index) => {
+      // Handle products with errors or missing data
+      if (product.error || !product.product) {
+        return [
+          `${index + 1}`,
+          <Thumbnail
+            key={`image-${product.id}`}
+            source="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            alt="Product not found"
+            size="small"
+          />,
+          <Text key={`title-${product.id}`} variant="bodyMd" color="subdued">
+            {product.error || "Product not available"}
+          </Text>,
+          <Text key={`price-${product.id}`} variant="bodyMd" color="subdued">
+            -
+          </Text>,
+          product.quantity.toString(),
+          new Date(product.createdAt).toLocaleDateString(),
+        ];
+      }
+
+      // Handle products with valid data
+      return [
+        `${index + 1}`,
+        <Thumbnail
+          key={`image-${product.id}`}
+          source={product.product.image || "https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"}
+          alt={product.product.imageAlt || product.product.title}
+          size="small"
+        />,
+        <Text key={`title-${product.id}`} variant="bodyMd">
+          {product.product.title}
+        </Text>,
+        <Text key={`price-${product.id}`} variant="bodyMd">
+          ${product.product.price}
+        </Text>,
+        product.quantity.toString(),
+        new Date(product.createdAt).toLocaleDateString(),
+      ];
+    });
+  };
+
+  const bundleProductsHeaders = [
+    "No.",
+    "Image",
+    "Title",
+    "Price",
+    "Quantity",
+    "Added Date",
   ];
 
   return (
@@ -149,32 +230,77 @@ export default function Index() {
                   <BlockStack gap="400">
                     {bundles.map((bundle) => (
                       <Card key={bundle.id}>
-                        <InlineStack align="space-between" blockAlign="center">
-                          <InlineStack gap="400" blockAlign="center">
-                            <Thumbnail
-                              source={bundle.imageUrl || "https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"}
-                              alt={bundle.imageAlt || bundle.title}
-                              size="medium"
-                            />
-                            <BlockStack gap="100">
-                              <Text as="h3" variant="headingMd">
-                                {bundle.title}
-                              </Text>
-                              {bundle.description && (
-                                <Text as="p" variant="bodyMd" color="subdued">
-                                  {bundle.description}
+                        <BlockStack gap="400">
+                          <InlineStack align="space-between" blockAlign="center">
+                            <InlineStack gap="400" blockAlign="center">
+                              <Thumbnail
+                                source={bundle.imageUrl || "https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"}
+                                alt={bundle.imageAlt || bundle.title}
+                                size="medium"
+                              />
+                              <BlockStack gap="100">
+                  <Text as="h3" variant="headingMd">
+                                  {bundle.title}
                                 </Text>
+                                {bundle.description && (
+                                  <Text as="p" variant="bodyMd" color="subdued">
+                                    {bundle.description}
+                                  </Text>
+                                )}
+                                <InlineStack gap="200" align="baseline">
+                                  <Text as="p" variant="bodyMd" color="subdued" textDecorationLine="line-through">
+                                    ${bundle.originalPrice?.toFixed(2) || "0.00"}
+                                  </Text>
+                                  <Text as="p" variant="headingSm" tone="success">
+                                    ${bundle.discountedPrice?.toFixed(2) || "0.00"}
+                                  </Text>
+                                  {bundle.savingsPercentage > 0 && (
+                                    <Text as="p" variant="bodySm" tone="success">
+                                      Save {bundle.savingsPercentage}%
+                  </Text>
+                                  )}
+                                </InlineStack>
+                                <Text as="p" variant="bodyMd" color="subdued">
+                                  {bundle.bundleProducts?.length || 0} products in bundle
+                  </Text>
+                </BlockStack>
+                            </InlineStack>
+                            <InlineStack gap="200">
+                    <Button
+                                variant="tertiary"
+                                onClick={() => toggleBundleExpansion(bundle.id)}
+                    >
+                                {expandedBundles.has(bundle.id) ? "Hide Products" : "Show Products"}
+                    </Button>
+                              <ActionMenu
+                                actions={actionMenuItems(bundle)}
+                                trigger="..."
+                              />
+                            </InlineStack>
+                </InlineStack>
+                          
+                          <Collapsible
+                            open={expandedBundles.has(bundle.id)}
+                            id={`bundle-${bundle.id}-products`}
+                          >
+                            <BlockStack gap="300">
+                              <Text as="h4" variant="headingSm">
+                                Bundle Products
+                    </Text>
+                              {bundle.bundleProducts && bundle.bundleProducts.length > 0 ? (
+                                <DataTable
+                                  columnContentTypes={['text', 'text', 'text', 'text', 'numeric', 'text']}
+                                  headings={bundleProductsHeaders}
+                                  rows={getBundleProductsTableData(bundle.bundleProducts)}
+                                />
+                              ) : (
+                                <Text as="p" variant="bodyMd" color="subdued">
+                                  No products added to this bundle yet.
+                    </Text>
                               )}
-                              <Text as="p" variant="bodyMd">
-                                ${bundle.discountedPrice}
-                              </Text>
                             </BlockStack>
-                          </InlineStack>
-                          <ActionMenu
-                            actions={actionMenuItems(bundle)}
-                            trigger="..."
-                          />
-                        </InlineStack>
+                          </Collapsible>
+                        </BlockStack>
                       </Card>
                     ))}
                   </BlockStack>

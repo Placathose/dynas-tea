@@ -41,18 +41,20 @@ model Shop {
 }
 
 model Bundle {
-  id              Int      @id @default(autoincrement())
-  title           String
-  description     String?
-  imageUrl        String? // URL of selected image
-  imageAlt        String? // Alt text for accessibility
-  imageSource     String? // "product", "collection", "file"
-  sourceId        String? // ID of source (product/collection ID)
-  originalPrice   Float
-  discountedPrice Float
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                Int      @id @default(autoincrement())
+  title             String
+  description       String?
+  imageUrl          String? // URL of selected image
+  imageAlt          String? // Alt text for accessibility
+  imageSource       String? // "product", "collection", "file"
+  sourceId          String? // ID of source (product/collection ID)
+  originalPrice     Float
+  discountedPrice   Float
+  savingsAmount     Float    @default(0)
+  savingsPercentage Int      @default(0) // Store as integer (e.g., 25 for 25%)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   // Relations
   shopId         String

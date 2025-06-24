@@ -1,0 +1,9 @@
+name = "Bundle Selector"
+type = "theme"
+
+[capabilities]
+api_access = true
+network_access = true
+block_progress = true
+
+[settings] 

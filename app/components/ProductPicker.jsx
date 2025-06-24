@@ -32,7 +32,10 @@ export default function ProductPicker({
           productImage: productImage,
           productAlt: productAlt,
           productVariantId: variants?.[0]?.id || "",
+          price: variants?.[0]?.price || "0",
         };
+        
+        console.log("ProductPicker - Selected product data:", productData);
         
         onProductSelect(productData);
       }
@@ -49,6 +52,7 @@ export default function ProductPicker({
       productImage: "",
       productAlt: "",
       productVariantId: "",
+      price: "0",
     });
   };
 

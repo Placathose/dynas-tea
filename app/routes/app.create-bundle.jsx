@@ -2,8 +2,6 @@ import {
   Page,
   Layout,
   Card,
-  Form,
-  FormLayout,
   TextField,
   Button,
   Select,
@@ -150,6 +148,7 @@ export async function action({ request }) {
   const targetProductTitle = formData.get("targetProductTitle") || "";
   const targetProductImage = formData.get("targetProductImage") || "";
   const targetProductAlt = formData.get("targetProductAlt") || "";
+  const targetProductPrice = formData.get("targetProductPrice") || "0";
 
   // Parse bundle items from form data
   const bundleItemsData = formData.get("bundleItems");
@@ -169,6 +168,7 @@ export async function action({ request }) {
     imageAlt: imageAlt,
     imageSource: formData.get("imageSource"),
     sourceId: formData.get("sourceId"),
+    originalPrice: parseFloat(targetProductPrice || "0"),
     discountedPrice: parseFloat(discountedPrice),
     isActive: isActive,
     shopId: session.shop,
@@ -197,7 +197,10 @@ export async function action({ request }) {
     imageUrl: bundleData.imageUrl,
     imageAlt: bundleData.imageAlt,
     imageSource: bundleData.imageSource,
-    bundleItemsCount: bundleItems.length
+    bundleItemsCount: bundleItems.length,
+    bundleItems: bundleItems,
+    originalPrice: bundleData.originalPrice,
+    discountedPrice: bundleData.discountedPrice
   });
 
   const validation = validateBundle(bundleData);
@@ -207,7 +210,10 @@ export async function action({ request }) {
   }
 
   try {
-    await createBundle(bundleData);
+    await createBundle({
+      ...bundleData,
+      graphql: admin.graphql
+    });
     return { success: true };
   } catch (error) {
     return { errors: { general: `Failed to save bundle: ${error.message}` } };
@@ -263,6 +269,7 @@ export default function CreateBundle() {
     formDataToSubmit.append("targetProductTitle", selectedProduct.productTitle);
     formDataToSubmit.append("targetProductImage", selectedProduct.productImage);
     formDataToSubmit.append("targetProductAlt", selectedProduct.productAlt);
+    formDataToSubmit.append("targetProductPrice", selectedProduct.price);
     
     // Add bundle items to form data
     formDataToSubmit.append("bundleItems", JSON.stringify(bundleItems));
@@ -344,8 +351,8 @@ export default function CreateBundle() {
       <Layout>
         <Layout.Section>
           <Card>
-            <Form onSubmit={handleSubmit}>
-              <FormLayout>
+            <form onSubmit={handleSubmit}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "16px" }}>
                 {errors.general && (
                   <Banner tone="critical">
                     <p>{errors.general}</p>
@@ -425,8 +432,8 @@ export default function CreateBundle() {
                     Create Bundle
                   </Button>
                 </div>
-              </FormLayout>
-            </Form>
+              </div>
+            </form>
           </Card>
         </Layout.Section>
       </Layout>
