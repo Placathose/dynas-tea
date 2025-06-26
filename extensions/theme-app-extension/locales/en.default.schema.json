@@ -1,0 +1,12 @@
+{
+  "bundle_selector": {
+    "name": "Bundle Selector",
+    "title": "Title",
+    "loading_text": "Loading Text",
+    "empty_text": "Empty State Text",
+    "styling": "Styling",
+    "background_color": "Background Color",
+    "border_color": "Border Color",
+    "border_radius": "Border Radius"
+  }
+} 

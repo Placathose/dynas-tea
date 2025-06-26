@@ -1,98 +1,45 @@
 {% comment %}
-  Bundle Selector Block - Fixed Placement
-  This block automatically finds the "Add to Cart" button and inserts bundles above it.
-  No manual theme editing required!
+  Bundle Selector Block - App Block for Shopify Themes
+  This block displays available bundles for the current product.
 {% endcomment %}
 
 {% if template == 'product' %}
   {% comment %} TEST ELEMENT - Remove this later {% endcomment %}
-  <div style="background: #ffeb3b; border: 3px solid #f57f17; padding: 15px; margin: 20px 0; border-radius: 8px; text-align: center; font-weight: bold; color: #333;">
-    🧪 BUNDLE SELECTOR EXTENSION LOADED! 🧪<br>
-    Product: {{ product.title }}<br>
-    Product ID: {{ product.id }}<br>
-    Template: {{ template }}
+  <div class="bundle-test-element">
+    {{ 'bundle_selector.test_loaded' | t }}<br>
+    {{ 'bundle_selector.product' | t: title: product.title }}<br>
+    {{ 'bundle_selector.product_id' | t: id: product.id }}<br>
+    {{ 'bundle_selector.template' | t: template: template }}
   </div>
 
-  {% comment %} Load CSS and JS only once per page {% endcomment %}
-  {% assign bundle_assets_loaded = bundle_assets_loaded | default: false %}
-  {% unless bundle_assets_loaded %}
-    {{ 'bundle-selector.css' | asset_url | stylesheet_tag }}
-    <script src="{{ 'bundle-selector.js' | asset_url }}" defer></script>
-    {% assign bundle_assets_loaded = true %}
-  {% endunless %}
-
-  {% comment %} Hidden container for bundle selector - will be moved by JavaScript {% endcomment %}
-  <div id="bundle-selector-container" class="bundle-selector" style="display: none; margin: 20px 0; padding: 20px; border: 1px solid {{ block.settings.border_color | default: '#ddd' }}; border-radius: {{ block.settings.border_radius | default: 8 }}px; background: {{ block.settings.background_color | default: '#f9f9f9' }};">
+  {% comment %} Bundle Selector Container {% endcomment %}
+  <div id="bundle-selector-container" class="bundle-selector">
     <div class="bundle-selector__header">
-      <h3 class="bundle-selector__title" style="margin: 0 0 15px 0; font-size: 18px; font-weight: 600;">{{ block.settings.title | default: 'Available Bundles' }}</h3>
+      <h3 class="bundle-selector__title">{{ block.settings.title | default: 'bundle_selector.title' | t }}</h3>
     </div>
-    <div class="bundle-selector__bundles" id="bundle-selector-bundles" style="display: flex; flex-direction: column; gap: 15px;">
+    <div class="bundle-selector__bundles" id="bundle-selector-bundles">
       <!-- Bundles will be loaded here via JavaScript -->
     </div>
   </div>
 
   {% comment %} Loading State {% endcomment %}
-  <div id="bundle-selector-loading" class="bundle-selector-loading" style="text-align: center; padding: 20px;">
-    <div class="bundle-selector-loading__spinner" style="width: 20px; height: 20px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 10px;"></div>
-    <p>{{ block.settings.loading_text | default: 'Loading bundles...' }}</p>
+  <div id="bundle-selector-loading" class="bundle-selector-loading">
+    <div class="bundle-selector-loading__spinner"></div>
+    <p>{{ block.settings.loading_text | default: 'bundle_selector.loading' | t }}</p>
   </div>
 
   {% comment %} No Bundles State {% endcomment %}
-  <div id="bundle-selector-empty" class="bundle-selector-empty" style="display: none; text-align: center; padding: 20px; color: #666;">
-    <p>{{ block.settings.empty_text | default: 'No bundles available for this product.' }}</p>
+  <div id="bundle-selector-empty" class="bundle-selector-empty">
+    <p>{{ block.settings.empty_text | default: 'bundle_selector.empty' | t }}</p>
   </div>
-
-  <style>
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    
-    .bundle-item {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-      padding: 15px;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      background: white;
-    }
-
-    .bundle-item__image {
-      width: 60px;
-      height: 60px;
-      object-fit: cover;
-      border-radius: 4px;
-    }
-
-    .bundle-item__details {
-      flex: 1;
-    }
-
-    .bundle-item__title {
-      font-weight: 500;
-      margin: 0 0 5px 0;
-    }
-
-    .bundle-item__price {
-      color: #666;
-      font-size: 14px;
-    }
-
-    .bundle-item__quantity {
-      background: #f0f0f0;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-      color: #666;
-    }
-  </style>
 {% endif %}
 
 {% schema %}
 {
   "name": "Bundle Selector",
   "target": "section",
+  "javascript": "bundle-selector.js",
+  "stylesheet": "bundle-selector.css",
   "settings": [
     {
       "type": "text",
@@ -126,7 +73,7 @@
       "type": "color",
       "id": "border_color",
       "label": "Border Color",
-      "default": "#ddd"
+      "default": "#e1e3e5"
     },
     {
       "type": "range",

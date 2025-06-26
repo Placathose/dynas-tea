@@ -82,7 +82,7 @@ model TargetProduct {
 model BundleProduct {
   id        Int      @id @default(autoincrement())
   bundleId  Int // Changed from String to Int to match Bundle.id
-  bundle    Bundle   @relation(fields: [bundleId], references: [id])
+  bundle    Bundle   @relation(fields: [bundleId], references: [id], onDelete: Cascade)
   productId String
   quantity  Int      @default(1)
   createdAt DateTime @default(now())

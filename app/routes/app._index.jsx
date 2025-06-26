@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFetcher, Link, useLoaderData, useSubmit, useActionData, useNavigate } from "@remix-run/react";
+import { useFetcher, Link, useLoaderData, useSubmit, useActionData, useNavigate, useRevalidator } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -25,7 +25,7 @@ import { json } from "@remix-run/node";
 
 export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
-  
+
   try {
     const bundles = await getBundles(session.shop, admin.graphql);
     return json({ bundles });
@@ -49,8 +49,8 @@ export const action = async ({ request }) => {
     } catch (error) {
       console.error("Error deleting bundle:", error);
       return json({ success: false, message: "Failed to delete bundle" });
-    }
-  }
+              }
+            }
   
   return json({ success: false, message: "Invalid action" });
 };
@@ -60,6 +60,7 @@ export default function Index() {
   const actionData = useActionData();
   const submit = useSubmit();
   const navigate = useNavigate();
+  const revalidator = useRevalidator();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [bundleToDelete, setBundleToDelete] = useState(null);
   const [expandedBundles, setExpandedBundles] = useState(new Set());
@@ -103,6 +104,7 @@ export default function Index() {
       submit(formData, { method: "post" });
       setDeleteModalOpen(false);
       setBundleToDelete(null);
+      revalidator.revalidate();
     }
   };
 

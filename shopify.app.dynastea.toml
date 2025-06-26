@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "2e569d1b8b8e3bfccd6ce4ee136512e0"
-application_url = "https://loved-mouse-architect-workstation.trycloudflare.com"
+application_url = "https://foul-putting-incidents-grain.trycloudflare.com"
 embedded = true
 name = "DynasTea"
 handle = "dynastea"
@@ -20,9 +20,9 @@ scopes = "write_products,read_products,write_files"
 
 [auth]
 redirect_urls = [
-  "https://loved-mouse-architect-workstation.trycloudflare.com/auth/callback",
-  "https://loved-mouse-architect-workstation.trycloudflare.com/auth/shopify/callback",
-  "https://loved-mouse-architect-workstation.trycloudflare.com/api/auth/callback"
+  "https://foul-putting-incidents-grain.trycloudflare.com/auth/callback",
+  "https://foul-putting-incidents-grain.trycloudflare.com/auth/shopify/callback",
+  "https://foul-putting-incidents-grain.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]

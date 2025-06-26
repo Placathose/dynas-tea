@@ -2,6 +2,8 @@
 
 A Remix-based Shopify app for creating product bundles with image uploads and product selection.
 
+![Demo Image](./public/BundleScreenshot.png)
+
 ## 🚀 Features
 - Product bundle creation with target product selection
 - Image uploads via Shopify's CDN

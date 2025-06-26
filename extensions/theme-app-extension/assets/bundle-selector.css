@@ -278,4 +278,16 @@
     align-items: flex-start;
     gap: 4px;
   }
+}
+
+/* Test Element - Remove this later */
+.bundle-test-element {
+  background: #ffeb3b;
+  border: 3px solid #f57f17;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: bold;
+  color: #333;
 } 

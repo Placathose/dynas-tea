@@ -17,6 +17,7 @@ import { getBundle, updateBundle, validateBundle } from "../models/Bundle.server
 import { json } from "@remix-run/node";
 import ImagePicker from "../components/ImagePicker";
 import ProductPicker from "../components/ProductPicker";
+import BundleProducts from "../components/BundleProducts";
 import db from "../db.server";
 
 export async function loader({ request, params }) {
@@ -187,6 +188,7 @@ export async function action({ request, params }) {
     discountedPrice: parseFloat(formData.get("discountedPrice") || "0"),
     isActive: formData.get("isActive") === "true",
     shopId: session.shop,
+    graphql: admin.graphql,
     // Create the targetProduct relation properly
     targetProduct: {
       create: {
@@ -197,8 +199,37 @@ export async function action({ request, params }) {
         productImage: formData.get("targetProductImage") || "",
         productAlt: formData.get("targetProductAlt") || "",
       }
+    },
+    // Parse bundle products data
+    bundleProducts: {
+      create: []
     }
   };
+
+  // Parse bundle products from form data
+  const bundleProductsData = [];
+  let index = 0;
+  while (formData.get(`bundleProducts[${index}][productId]`)) {
+    const productId = formData.get(`bundleProducts[${index}][productId]`);
+    const quantity = parseInt(formData.get(`bundleProducts[${index}][quantity]`) || "1");
+    
+    if (productId) {
+      bundleProductsData.push({
+        productId: productId,
+        quantity: quantity
+      });
+    }
+    index++;
+  }
+  
+  bundleData.bundleProducts.create = bundleProductsData;
+  
+  console.log('Bundle data for update:', {
+    title: bundleData.title,
+    targetProduct: bundleData.targetProduct,
+    bundleProductsCount: bundleData.bundleProducts.create.length,
+    bundleProducts: bundleData.bundleProducts.create
+  });
 
   const validation = validateBundle(bundleData);
   
@@ -245,6 +276,16 @@ export default function EditBundle() {
     sourceId: bundle?.sourceId || "",
   });
 
+  const [bundleProducts, setBundleProducts] = useState(
+    bundle?.bundleProducts?.map(bp => ({
+      id: bp.id,
+      productId: bp.productId,
+      quantity: bp.quantity,
+      product: bp.product,
+      error: bp.error
+    })) || []
+  );
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -259,6 +300,12 @@ export default function EditBundle() {
     formDataToSubmit.append("targetProductTitle", selectedProduct.productTitle);
     formDataToSubmit.append("targetProductImage", selectedProduct.productImage);
     formDataToSubmit.append("targetProductAlt", selectedProduct.productAlt);
+    
+    // Add bundle products data
+    bundleProducts.forEach((product, index) => {
+      formDataToSubmit.append(`bundleProducts[${index}][productId]`, product.productId);
+      formDataToSubmit.append(`bundleProducts[${index}][quantity]`, product.quantity.toString());
+    });
     
     // Handle image upload if it's a file
     if (selectedImage.file) {
@@ -280,6 +327,10 @@ export default function EditBundle() {
 
   const handleProductSelect = (productData) => {
     setSelectedProduct(productData);
+  };
+
+  const handleBundleProductsChange = (products) => {
+    setBundleProducts(products);
   };
 
   const handleCancel = () => {
@@ -362,6 +413,12 @@ export default function EditBundle() {
                 {errors.targetProductId && (
                   <InlineError message={errors.targetProductId} />
                 )}
+
+                <BundleProducts
+                  bundleProducts={bundleProducts}
+                  onBundleProductsChange={handleBundleProductsChange}
+                  label="Bundle Products"
+                />
 
                 <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                   <Button onClick={handleCancel}>Cancel</Button>

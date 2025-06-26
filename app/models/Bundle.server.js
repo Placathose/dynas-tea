@@ -425,12 +425,20 @@ export async function updateBundle(id, data) {
           update: data.targetProduct.create,
         }
       } : undefined,
+      bundleProducts: data.bundleProducts ? {
+        deleteMany: {}, // Delete all existing bundle products
+        create: data.bundleProducts.create || [] // Create new ones
+      } : undefined,
       originalPrice: pricingData.originalPrice,
       discountedPrice: pricingData.discountedPrice,
       savingsAmount: pricingData.savingsAmount,
       savingsPercentage: pricingData.savingsPercentage,
       isActive: data.isActive !== false,
     },
+    include: {
+      bundleProducts: true,
+      targetProduct: true,
+    }
   });
 }
 

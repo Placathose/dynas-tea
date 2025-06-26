@@ -1,0 +1,17 @@
+{
+  "bundle_selector": {
+    "title": "Available Bundles",
+    "loading": "Loading bundles...",
+    "empty": "No bundles available for this product.",
+    "bundle_contents": "Bundle Contents:",
+    "select_bundle": "Select Bundle",
+    "bundle_selected": "Bundle Selected",
+    "no_products": "No products in this bundle.",
+    "quantity": "Qty: {quantity}",
+    "save_percent": "Save {percent}%",
+    "test_loaded": "🧪 BUNDLE SELECTOR EXTENSION LOADED! 🧪",
+    "product": "Product: {title}",
+    "product_id": "Product ID: {id}",
+    "template": "Template: {template}"
+  }
+} 
