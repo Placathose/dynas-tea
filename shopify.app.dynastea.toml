@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "2e569d1b8b8e3bfccd6ce4ee136512e0"
-application_url = "https://foul-putting-incidents-grain.trycloudflare.com"
+application_url = "https://ins-basement-quickly-instructors.trycloudflare.com"
 embedded = true
 name = "DynasTea"
 handle = "dynastea"
@@ -19,11 +19,7 @@ api_version = "2025-04"
 scopes = "write_products,read_products,write_files"
 
 [auth]
-redirect_urls = [
-  "https://foul-putting-incidents-grain.trycloudflare.com/auth/callback",
-  "https://foul-putting-incidents-grain.trycloudflare.com/auth/shopify/callback",
-  "https://foul-putting-incidents-grain.trycloudflare.com/api/auth/callback"
-]
+redirect_urls = ["https://ins-basement-quickly-instructors.trycloudflare.com/auth/callback", "https://ins-basement-quickly-instructors.trycloudflare.com/auth/shopify/callback", "https://ins-basement-quickly-instructors.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false
